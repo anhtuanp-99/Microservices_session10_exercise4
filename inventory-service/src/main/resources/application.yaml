@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: inventory-service
+
+  # ===== DATABASE — dùng chung pharmacy_db với pharmacy-service =====
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pharmacy_db
+    username: postgres
+    password: pass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # ===== KAFKA CONSUMER =====
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      # group-id — tất cả instance inventory-service dùng CÙNG group
+      # → mỗi partition chỉ được xử lý bởi 1 consumer trong group
+      group-id: inventory-service-group
+
+      # Bắt đầu đọc từ đầu nếu chưa có offset (lần đầu chạy)
+      auto-offset-reset: earliest
+
+      # Deserialize key là String, value là JSON → OrderEvent
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+
+      properties:
+        spring.json.trusted.packages: "com.pharmacy.*"
+        spring.json.value.default.type: com.pharmacy.inventoryservice.event.OrderEvent
+        spring.json.use.type.headers: false
+
+    listener:
+      # Commit offset thủ công sau mỗi message
+      ack-mode: record
+      # Số thread mỗi listener — mặc định 1, bằng số partition để maximize throughput
+      concurrency: 3
+
+server:
+  port: 8087
+
+app:
+  kafka:
+    topic:
+      stock-events: medicine-stock-events
+
+logging:
+  level:
+    org.springframework.kafka: INFO
+    com.pharmacy.inventoryservice: DEBUG
